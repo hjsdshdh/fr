@@ -1,0 +1,47 @@
+name: Build Kernel with ReSukiSU
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+
+    steps:
+      - name: Checkout script
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt update
+          sudo apt install -y git wget make zip unzip curl bc bison flex libssl-dev build-essential device-tree-compiler
+
+      # 🔥 新增：安装 ld.lld 链接器
+      - name: Install LLVM and lld
+        run: |
+          sudo apt install -y llvm-18 lld-18
+          sudo ln -sf /usr/bin/ld.lld-18 /usr/bin/ld.lld
+          ld.lld --version  # 验证安装成功
+
+      - name: Setup Swap and Limit CPU threads
+        run: |
+          sudo fallocate -l 8G /swapfile
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile
+          sed -i 's/-j\$(nproc --all)/-j2/g' build.sh
+          free -h
+
+      - name: Run build script
+        run: |
+          chmod +x build.sh
+          echo -e "4\ny\ny\ny\ny\ny\ny\ny" | ./build.sh
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Kernel-AnyKernel3
+          path: /home/runner/android_kernel/nx721j_out/AnyKernel3-*.zip
