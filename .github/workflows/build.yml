@@ -19,16 +19,17 @@ jobs:
           sudo apt update
           sudo apt install -y git wget make zip unzip curl bc bison flex libssl-dev build-essential device-tree-compiler
 
-      # 🔥 新增：安装 ld.lld 链接器
       - name: Install LLVM and lld
         run: |
           sudo apt install -y llvm-18 lld-18
           sudo ln -sf /usr/bin/ld.lld-18 /usr/bin/ld.lld
-          ld.lld --version  # 验证安装成功
+          ld.lld --version
 
       - name: Setup Swap and Limit CPU threads
         run: |
-          sudo fallocate -l 8G /swapfile
+          sudo swapoff /swapfile 2>/dev/null || true
+          sudo rm -f /swapfile
+          sudo dd if=/dev/zero of=/swapfile bs=1M count=8192 status=progress
           sudo chmod 600 /swapfile
           sudo mkswap /swapfile
           sudo swapon /swapfile
