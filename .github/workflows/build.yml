@@ -1,16 +1,12 @@
 name: Build Nubia Z60 Ultra Kernel (ReSukiSU)
 
 on:
-  # 手动触发
   workflow_dispatch:
-  # 也可在 push 到 main 分支时自动触发（按需开启）
-  # push:
-  #   branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360   # 内核编译耗时较长，设 6 小时超时
+    timeout-minutes: 360
 
     steps:
       - name: Checkout repository
@@ -32,15 +28,21 @@ jobs:
             wget \
             xz-utils
 
-      - name: Build kernel (ReSukiSU with all features enabled)
+      - name: Build kernel (ReSukiSU with all features)
         run: |
           chmod +x build.sh
-          # 选项：4(ReSukiSU) + 7个 y (启用所有功能)
           echo -e "4\ny\ny\ny\ny\ny\ny\ny" | ./build.sh
+
+      - name: List output directory contents (debug)
+        run: |
+          echo "Contents of /home/runner/android_kernel/nx721j_out:"
+          ls -lh /home/runner/android_kernel/nx721j_out/ || echo "Directory not found!"
 
       - name: Upload AnyKernel3 ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: ReSukiSU-Kernel-$(date +%Y%m%d-%H%M%S)
-          path: android_kernel/nx721j_out/AnyKernel3-*.zip
+          # 使用绝对路径，确保能找到生成的 ZIP
+          path: /home/runner/android_kernel/nx721j_out/*.zip
           retention-days: 7
+          if-no-files-found: error   # 若没有ZIP文件则让任务失败，便于发现问题
