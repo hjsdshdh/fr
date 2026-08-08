@@ -32,7 +32,8 @@ jobs:
             make \
             gcc \
             g++ \
-            curl
+            curl \
+            dwarves   # 提供 pahole，解决 BTF 生成问题
 
       - name: Build kernel
         run: |
