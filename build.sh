@@ -1,13 +1,13 @@
 #!/bin/bash
-set -e  # 任何命令失败则退出
-set -x  # 打印执行的命令（调试用）
+set -e
+set -x
 
 echo "
 ###############################
 # 努比亚z60 ultra内核编译脚本 #
 ###############################"
 
-# KernelSU原版 (保留，但本脚本固定使用ReSukiSU)
+# KernelSU原版
 kernelsu_office() {
 	curl -LSs "https://raw.githubusercontent.com/tiann/KernelSU/main/kernel/setup.sh" | bash -s main
 	[[ "${SUSFS_STAT}" =~ ^[yY]$ ]] && patch -p1 -F3 -d ${KERNEL_DIR}/KernelSU < ${HOME}/android_kernel/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
@@ -43,13 +43,11 @@ susfs_patch() {
 	cp -r ${HOME}/android_kernel/susfs4ksu/kernel_patches/include ${KERNEL_DIR}
 	patch -p1 -F3 -d ${KERNEL_DIR} < ${HOME}/android_kernel/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
 }
-# 为内核打入KernelSU-Next专有SuSFS补丁
 next_susfs_patch() {
 	cp -r ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/fs ${KERNEL_DIR}
 	cp -r ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/include ${KERNEL_DIR}
 	patch -p1 -F3 -d ${KERNEL_DIR} < ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
 }
-# 下载更新SuSFS补丁
 update_susfs() {
 	if [ -d "${HOME}/android_kernel/susfs4ksu/.git" ]; then
 		cd ${HOME}/android_kernel/susfs4ksu
@@ -60,7 +58,6 @@ update_susfs() {
 		git clone https://gitlab.com/pershoot/susfs4ksu.git -b gki-android14-6.1-dev --depth=1 ${HOME}/android_kernel/susfs4ksu
 	fi
 }
-# 下载更新KernelSU-Next专有SuSFS补丁
 update_nextsusfs() {
 	if [ -d "${HOME}/android_kernel/ps_susfs4ksu/.git" ]; then
 		cd ${HOME}/android_kernel/ps_susfs4ksu
@@ -72,7 +69,7 @@ update_nextsusfs() {
 	fi
 }
 
-# ----- 固定配置（选择 ReSukiSU + 全部功能） -----
+# 固定配置
 KERNELSU_TAG=4
 SUSFS_STAT=y
 NET_STAT=y
@@ -82,7 +79,6 @@ DS_STAT=y
 SSG_STAT=y
 BBG_STAT=y
 
-# 环境变量
 export PATH=${HOME}/android_kernel/build-tools/llvm22/bin:${PATH}
 export KERNEL_DIR=${HOME}/android_kernel/android_nx721j_kernel
 export OUT_DIR=${HOME}/android_kernel/nx721j_out
@@ -96,17 +92,24 @@ export BUILD_NUMBER="11695701"
 export KBUILD_BUILD_TIMESTAMP="Wed Apr 10 08:51:29 UTC 2024"
 export KBUILD_BUILD_VERSION=1
 
-# 准备目录和源码
 mkdir -p ${HOME}/android_kernel
 [ ! -d "${KERNEL_DIR}" ] && git clone https://github.com/xiaoxian8/android_nx721j_kernel.git -b myos14.5 --depth=1 ${KERNEL_DIR}
 [ ! -d "${HOME}/android_kernel/build-tools/llvm22" ] && {
     wget -P ${HOME}/ https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
     tar -xvf ${HOME}/LLVM-22.1.8-Linux-X64.tar.xz -C ${HOME}
-    mv ${HOME}/LLVM-22.1.8-Linux-x64 ${HOME}/android_kernel/build-tools/llvm22
+    # 修正：实际解压目录名是大写 X64
+    if [ -d "${HOME}/LLVM-22.1.8-Linux-X64" ]; then
+        mv ${HOME}/LLVM-22.1.8-Linux-X64 ${HOME}/android_kernel/build-tools/llvm22
+    elif [ -d "${HOME}/LLVM-22.1.8-Linux-x64" ]; then
+        mv ${HOME}/LLVM-22.1.8-Linux-x64 ${HOME}/android_kernel/build-tools/llvm22
+    else
+        echo "错误：解压后的LLVM目录未找到！"
+        ls -l ${HOME}
+        exit 1
+    fi
 }
 [ ! -d "${HOME}/android_kernel/AnyKernel3" ] && git clone https://github.com/Kernel-SU/AnyKernel3.git --depth=1 ${HOME}/android_kernel/AnyKernel3
 
-# 清理并准备内核源码
 cd ${KERNEL_DIR}
 git checkout --ours .
 rm -f ${KERNEL_DIR}/drivers/kernelsu
@@ -115,7 +118,6 @@ rm -rf ${KERNEL_DIR}/KernelSU-Next
 find . -name "*.rej" -delete
 find . -name "*.orig" -delete
 
-# 合并配置
 ./scripts/kconfig/merge_config.sh -m \
     arch/arm64/configs/gki_defconfig \
     arch/arm64/configs/vendor/pineapple_GKI.config \
@@ -125,7 +127,6 @@ find . -name "*.orig" -delete
 mv .config ${DEFCONFIG_FILE}
 sed -i 's/ -dirty//g' "${KERNEL_DIR}/scripts/setlocalversion"
 
-# 判断并加入KernelSU和SuSFS（固定为 ReSukiSU）
 case ${KERNELSU_TAG} in
 	1|3|4)
 		[[ "${SUSFS_STAT}" =~ ^[yY]$ ]] && update_susfs && susfs_patch
@@ -141,7 +142,6 @@ case ${KERNELSU_TAG} in
 		;;
 esac
 
-# 获取KernelSU版本以及加入SuSF默认配置
 case ${KERNELSU_TAG} in
 	1|2|3|4)
 		if [ -d KernelSU ]; then
@@ -180,7 +180,6 @@ EOF
 		fi
 esac
 
-# SSG IO支持
 if [[ "${SSG_STAT}" =~ ^[yY]$ ]]; then
 	SSG_V="+SSG"
 	[ ! -d "${HOME}/android_kernel/ssg_patch" ] && git clone https://github.com/xiaoxian8/ssg_patch.git --depth=1 ${HOME}/android_kernel/ssg_patch
@@ -192,7 +191,6 @@ CONFIG_MQ_IOSCHED_SSG_CGROUP=y
 EOF
 fi
 
-# BBG基带保护
 if [[ "${BBG_STAT}" =~ ^[yY]$ ]]; then
 	BBG_V="+BBG"
 	wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
@@ -203,7 +201,6 @@ CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,smack,tom
 EOF
 fi
 
-# TCP BBR
 if [[ "${BBR_STAT}" =~ ^[yY]$ ]]; then
 	BBR_V="+BBR"
 	cat >>${DEFCONFIG_FILE}<<EOF
@@ -216,7 +213,6 @@ CONFIG_TCP_CONG_HTCP=n
 EOF
 fi
 
-# Mountify
 if [[ "${MFY_STAT}" =~ ^[yY]$ ]]; then
 	MFY_V="+Mountify"
 	cat >>${DEFCONFIG_FILE}<<EOF
@@ -225,7 +221,6 @@ CONFIG_TMPFS_POSIX_ACL=y
 EOF
 fi
 
-# Netfilter & IPSET
 if [[ "${NET_STAT}" =~ ^[yY]$ ]]; then
 	NET_V="+Netfilter+IPSET"
 	cat>>${DEFCONFIG_FILE}<<EOF
@@ -252,7 +247,6 @@ CONFIG_IP_SET_LIST_SET=y
 EOF
 fi
 
-# Droidspaces
 if [[ "${DS_STAT}" =~ ^[yY]$ ]]; then
 	export DDP_V="+Droidspaces"
 	[ ! -f "${KERNEL_DIR}/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch" ] && wget https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/refs/heads/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch
@@ -269,7 +263,6 @@ CONFIG_NETFILTER_XT_MATCH_RECENT=y
 EOF
 fi
 
-# Fail2ban 支持（若DS启用但NET未启用，补充所需）
 if [[ "${DS_STAT}" =~ ^[yY]$ && ! "${NET_STAT}" =~ ^[yY]$ ]]; then
 	cat >>${DEFCONFIG_FILE}<<EOF
 CONFIG_IP_SET=y
@@ -279,7 +272,6 @@ CONFIG_NETFILTER_XT_SET=y
 EOF
 fi
 
-# Droidspaces必要条件（若未启用Mountify，补充）
 if [[ "${DS_STAT}" =~ ^[yY]$ && ! "${MFY_STAT}" =~ ^[yY]$ ]]; then
 	cat >>${DEFCONFIG_FILE}<<EOF
 CONFIG_TMPFS_XATTR=y
@@ -287,7 +279,6 @@ CONFIG_TMPFS_POSIX_ACL=y
 EOF
 fi
 
-# 编译参数
 args="-j$(nproc --all) \
     O=${OUT_DIR} \
     -C ${KERNEL_DIR} \
@@ -296,7 +287,6 @@ args="-j$(nproc --all) \
     DEPMOD=depmod \
     DTC=/usr/bin/dtc"
 
-# 生成配置
 make ${args} nx721j_defconfig
 
 ${KERNEL_DIR}/scripts/config --file ${OUT_DIR}/.config \
@@ -311,10 +301,8 @@ ${KERNEL_DIR}/scripts/config --file ${OUT_DIR}/.config \
 
 make ${args} olddefconfig
 
-# 编译内核与模块
 make ${args} Image.lz4
 
-# 检查内核镜像是否生成
 if [ ! -f ${OUT_DIR}/arch/arm64/boot/Image ]; then
     echo "❌ 错误：内核镜像未生成！编译失败。"
     echo "检查 ${OUT_DIR}/arch/arm64/boot/ 目录："
@@ -322,7 +310,6 @@ if [ ! -f ${OUT_DIR}/arch/arm64/boot/Image ]; then
     exit 1
 fi
 
-# 打包 AnyKernel3
 cp -v ${OUT_DIR}/arch/arm64/boot/Image ${HOME}/android_kernel/AnyKernel3
 cd ${HOME}/android_kernel/AnyKernel3
 ZIP_NAME="AnyKernel3${KSU_BRANCH}${KSU_VERSION}${SUSFS_V}${BBR_V}${NET_V}${MFY_V}${DDP_V}${SSG_V}${BBG_V}-$(date +%Y-%m-%d).zip"
