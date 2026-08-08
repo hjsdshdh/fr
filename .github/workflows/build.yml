@@ -1,83 +1,46 @@
-name: Build Kernel with ReSukiSU (Reliable)
+name: Build Nubia Z60 Ultra Kernel (ReSukiSU)
 
 on:
+  # 手动触发
   workflow_dispatch:
-  push:
-    branches: [ main ]
+  # 也可在 push 到 main 分支时自动触发（按需开启）
+  # push:
+  #   branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 360
+    timeout-minutes: 360   # 内核编译耗时较长，设 6 小时超时
 
     steps:
-      - name: Checkout script
+      - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install build dependencies
         run: |
-          sudo apt update
-          sudo apt install -y git wget make zip unzip curl bc bison flex libssl-dev build-essential device-tree-compiler llvm-18 lld-18
+          sudo apt-get update
+          sudo apt-get install -y \
+            libelf-dev \
+            libssl-dev \
+            flex \
+            bison \
+            bc \
+            cpio \
+            python3 \
+            python3-dev \
+            git \
+            wget \
+            xz-utils
 
-      # ============================================================
-      # 1. 手动克隆内核源码（跳过 build.sh 中的 clone）
-      # ============================================================
-      - name: Clone kernel source
-        run: |
-          mkdir -p ~/android_kernel
-          cd ~/android_kernel
-          git clone https://github.com/xiaoxian8/android_nx721j_kernel.git -b myos14.5 --depth=1
-
-      # ============================================================
-      # 2. 修复 bcmp 错误（批量替换为 memcmp）
-      # ============================================================
-      - name: Fix bcmp error in kernel source
-        run: |
-          KERNEL_DIR=~/android_kernel/android_nx721j_kernel
-          find $KERNEL_DIR -type f -name "*.c" -exec sed -i 's/\bbcmp\b/memcmp/g' {} +
-
-      # ============================================================
-      # 3. 修改 build.sh 以适配手动克隆的环境
-      # ============================================================
-      - name: Patch build.sh
-        run: |
-          # 3a. 注释掉下载 LLVM 的 wget 命令
-          sed -i '/^wget -P ${HOME}\/ https:\/\/github.com\/llvm\/llvm-project\/releases/,/mv ${HOME}\/LLVM-22.1.8-Linux-x64 ${HOME}\/android_kernel\/build-tools\/llvm22/s/^/# /' build.sh
-
-          # 3b. 注释掉原有的 PATH 设置，改用系统 LLVM
-          sed -i 's|^export PATH=${HOME}/android_kernel/build-tools/llvm22/bin:${PATH}|# &|' build.sh
-          sed -i '3i export PATH=/usr/lib/llvm-18/bin:${PATH}' build.sh
-
-          # 3c. 将内核源码目录改为已经克隆的路径（虽然默认就是 $HOME/android_kernel，但确保一致）
-          #     不需要改，因为 build.sh 中 KERNEL_DIR 默认就是 ~/android_kernel/android_nx721j_kernel
-
-          # 3d. 禁止 build.sh 再次 git clone（因为已经存在，它的条件判断 [ ! -d ] 会跳过）
-          #     所以无需修改，它会检测到目录已存在而不克隆
-
-          # 3e. 限制并行编译数（避免内存爆炸）
-          sed -i 's/-j\$(nproc --all)/-j2/g' build.sh
-
-          # 3f. 修正 dtc 路径（Ubuntu 中是 /usr/bin/dtc，不需要改）
-          #     但 build.sh 中已有 DTC=/usr/bin/dtc，没问题
-
-          # 验证修改
-          echo "=== Modified build.sh (first 30 lines) ==="
-          head -30 build.sh
-
-      # ============================================================
-      # 4. 运行 build.sh（此时它会使用已存在的源码目录）
-      # ============================================================
-      - name: Run build script
+      - name: Build kernel (ReSukiSU with all features enabled)
         run: |
           chmod +x build.sh
-          # 输入选项：4(ReSukiSU) + 7个 y
+          # 选项：4(ReSukiSU) + 7个 y (启用所有功能)
           echo -e "4\ny\ny\ny\ny\ny\ny\ny" | ./build.sh
 
-      # ============================================================
-      # 5. 上传产物
-      # ============================================================
-      - name: Upload artifact
+      - name: Upload AnyKernel3 ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Kernel-AnyKernel3
-          path: /home/runner/android_kernel/nx721j_out/AnyKernel3-*.zip
+          name: ReSukiSU-Kernel-$(date +%Y%m%d-%H%M%S)
+          path: android_kernel/nx721j_out/AnyKernel3-*.zip
+          retention-days: 7
