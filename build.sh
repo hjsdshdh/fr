@@ -69,7 +69,7 @@ update_nextsusfs() {
 	fi
 }
 
-# 固定配置
+# 固定选择 ReSukiSU + 全部功能
 KERNELSU_TAG=4
 SUSFS_STAT=y
 NET_STAT=y
@@ -93,11 +93,16 @@ export KBUILD_BUILD_TIMESTAMP="Wed Apr 10 08:51:29 UTC 2024"
 export KBUILD_BUILD_VERSION=1
 
 mkdir -p ${HOME}/android_kernel
+
+# 内核源码
 [ ! -d "${KERNEL_DIR}" ] && git clone https://github.com/xiaoxian8/android_nx721j_kernel.git -b myos14.5 --depth=1 ${KERNEL_DIR}
+
+# LLVM 工具链（修复：先创建父目录，再移动）
 [ ! -d "${HOME}/android_kernel/build-tools/llvm22" ] && {
+    mkdir -p ${HOME}/android_kernel/build-tools   # 确保父目录存在
     wget -P ${HOME}/ https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
     tar -xvf ${HOME}/LLVM-22.1.8-Linux-X64.tar.xz -C ${HOME}
-    # 修正：实际解压目录名是大写 X64
+    # 兼容大小写
     if [ -d "${HOME}/LLVM-22.1.8-Linux-X64" ]; then
         mv ${HOME}/LLVM-22.1.8-Linux-X64 ${HOME}/android_kernel/build-tools/llvm22
     elif [ -d "${HOME}/LLVM-22.1.8-Linux-x64" ]; then
@@ -108,6 +113,8 @@ mkdir -p ${HOME}/android_kernel
         exit 1
     fi
 }
+
+# AnyKernel3
 [ ! -d "${HOME}/android_kernel/AnyKernel3" ] && git clone https://github.com/Kernel-SU/AnyKernel3.git --depth=1 ${HOME}/android_kernel/AnyKernel3
 
 cd ${KERNEL_DIR}
@@ -180,6 +187,7 @@ EOF
 		fi
 esac
 
+# SSG
 if [[ "${SSG_STAT}" =~ ^[yY]$ ]]; then
 	SSG_V="+SSG"
 	[ ! -d "${HOME}/android_kernel/ssg_patch" ] && git clone https://github.com/xiaoxian8/ssg_patch.git --depth=1 ${HOME}/android_kernel/ssg_patch
@@ -191,6 +199,7 @@ CONFIG_MQ_IOSCHED_SSG_CGROUP=y
 EOF
 fi
 
+# BBG
 if [[ "${BBG_STAT}" =~ ^[yY]$ ]]; then
 	BBG_V="+BBG"
 	wget -O- https://github.com/vc-teahouse/Baseband-guard/raw/main/setup.sh | bash
@@ -201,6 +210,7 @@ CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,integrity,selinux,smack,tom
 EOF
 fi
 
+# BBR
 if [[ "${BBR_STAT}" =~ ^[yY]$ ]]; then
 	BBR_V="+BBR"
 	cat >>${DEFCONFIG_FILE}<<EOF
@@ -213,6 +223,7 @@ CONFIG_TCP_CONG_HTCP=n
 EOF
 fi
 
+# Mountify
 if [[ "${MFY_STAT}" =~ ^[yY]$ ]]; then
 	MFY_V="+Mountify"
 	cat >>${DEFCONFIG_FILE}<<EOF
@@ -221,6 +232,7 @@ CONFIG_TMPFS_POSIX_ACL=y
 EOF
 fi
 
+# Netfilter
 if [[ "${NET_STAT}" =~ ^[yY]$ ]]; then
 	NET_V="+Netfilter+IPSET"
 	cat>>${DEFCONFIG_FILE}<<EOF
@@ -247,6 +259,7 @@ CONFIG_IP_SET_LIST_SET=y
 EOF
 fi
 
+# Droidspaces
 if [[ "${DS_STAT}" =~ ^[yY]$ ]]; then
 	export DDP_V="+Droidspaces"
 	[ ! -f "${KERNEL_DIR}/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch" ] && wget https://raw.githubusercontent.com/ravindu644/Droidspaces-OSS/refs/heads/main/Documentation/resources/kernel-patches/GKI/below-kernel-6.12/001.GKI-below-6.12-fix_sysvipc_kabi_3_4_5.patch
