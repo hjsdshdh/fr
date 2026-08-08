@@ -12,12 +12,14 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install build dependencies
+      - name: Install all build dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
             libelf-dev \
             libssl-dev \
+            libz-dev \
+            libncurses-dev \
             flex \
             bison \
             bc \
@@ -26,23 +28,39 @@ jobs:
             python3-dev \
             git \
             wget \
-            xz-utils
+            xz-utils \
+            make \
+            gcc \
+            g++ \
+            curl
+
+      - name: Verify libelf.h is installed
+        run: |
+          if [ ! -f /usr/include/libelf.h ]; then
+            echo "❌ libelf.h not found! 依赖安装失败。"
+            exit 1
+          else
+            echo "✅ libelf.h found."
+          fi
 
       - name: Build kernel (ReSukiSU with all features)
         run: |
           chmod +x build.sh
+          # 使用 set -e 使得任何命令失败即退出
+          set -e
           echo -e "4\ny\ny\ny\ny\ny\ny\ny" | ./build.sh
 
       - name: List output directory contents (debug)
         run: |
-          echo "Contents of /home/runner/android_kernel/nx721j_out:"
-          ls -lh /home/runner/android_kernel/nx721j_out/ || echo "Directory not found!"
+          echo "📂 Contents of /home/runner/android_kernel/nx721j_out:"
+          ls -lh /home/runner/android_kernel/nx721j_out/ || echo "目录不存在！"
+          echo "📂 Contents of /home/runner/android_kernel/AnyKernel3:"
+          ls -lh /home/runner/android_kernel/AnyKernel3/ || echo "目录不存在！"
 
       - name: Upload AnyKernel3 ZIP artifact
         uses: actions/upload-artifact@v4
         with:
           name: ReSukiSU-Kernel-$(date +%Y%m%d-%H%M%S)
-          # 使用绝对路径，确保能找到生成的 ZIP
           path: /home/runner/android_kernel/nx721j_out/*.zip
           retention-days: 7
-          if-no-files-found: error   # 若没有ZIP文件则让任务失败，便于发现问题
+          if-no-files-found: error
