@@ -1,4 +1,4 @@
-name: Build Nubia Z60 Ultra Kernel (ReSukiSU)
+name: Build Nubia Z60 Ultra Kernel (BakaSU)
 
 on:
   workflow_dispatch:
@@ -11,6 +11,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Install build dependencies
         run: |
@@ -33,7 +35,17 @@ jobs:
             gcc \
             g++ \
             curl \
-            dwarves   # 提供 pahole，解决 BTF 生成问题
+            dwarves \
+            device-tree-compiler \
+            liblz4-tool \
+            zip \
+            unzip
+
+      - name: Verify AnyKernel3 template
+        run: |
+          test -f "${GITHUB_WORKSPACE}/AnyKernel3-reference-template.zip"
+          echo "✅ AnyKernel3 reference template found."
+          unzip -l "${GITHUB_WORKSPACE}/AnyKernel3-reference-template.zip"
 
       - name: Build kernel
         run: |
@@ -50,7 +62,7 @@ jobs:
       - name: Upload AnyKernel3 ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: ReSukiSU-Kernel
+          name: BakaSU-Kernel
           path: /home/runner/android_kernel/nx721j_out/*.zip
           retention-days: 7
           if-no-files-found: error
