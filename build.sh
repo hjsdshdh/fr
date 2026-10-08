@@ -1,6 +1,9 @@
 #!/bin/bash
 set -e
 set -x
+set -o pipefail
+
+trap 'echo "❌ build.sh 在第 ${LINENO} 行失败：${BASH_COMMAND}"' ERR
 
 echo "
 ###############################
@@ -13,6 +16,7 @@ kernelsu_office() {
 	[[ "${SUSFS_STAT}" =~ ^[yY]$ ]] && patch -p1 -F3 -d ${KERNEL_DIR}/KernelSU < ${HOME}/android_kernel/susfs4ksu/kernel_patches/KernelSU/10_enable_susfs_for_ksu.patch
 	KSU_BRANCH="-KernelSU"
 }
+
 # kernelSU-Next
 kernelsu_next() {
 	if [[ "${SUSFS_STAT}" =~ ^[yY]$ ]]; then
@@ -22,6 +26,7 @@ kernelsu_next() {
 	fi
 	KSU_BRANCH="-KernelSU_Next"
 }
+
 # SukiSU Ultra
 sukisu_ultra() {
 	if [[ "${SUSFS_STAT}" =~ ^[yY]$ ]]; then
@@ -31,10 +36,11 @@ sukisu_ultra() {
 	fi
 	KSU_BRANCH="-SukiSU_Ultra"
 }
-# ReSukiSU
-resukisu() {
-	curl -LSs "https://raw.githubusercontent.com/ReSukiSU/ReSukiSU/main/kernel/setup.sh" | bash
-	KSU_BRANCH="-ReSukiSU"
+
+# BakaSU（原 ReSukiSU）
+bakasu() {
+	curl -LSs "https://raw.githubusercontent.com/Baka-SU/BakaSU/main/kernel/setup.sh" | bash
+	KSU_BRANCH="-BakaSU"
 }
 
 # 为内核打入SuSFS补丁
@@ -43,11 +49,13 @@ susfs_patch() {
 	cp -r ${HOME}/android_kernel/susfs4ksu/kernel_patches/include ${KERNEL_DIR}
 	patch -p1 -F3 -d ${KERNEL_DIR} < ${HOME}/android_kernel/susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
 }
+
 next_susfs_patch() {
 	cp -r ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/fs ${KERNEL_DIR}
 	cp -r ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/include ${KERNEL_DIR}
 	patch -p1 -F3 -d ${KERNEL_DIR} < ${HOME}/android_kernel/ps_susfs4ksu/kernel_patches/50_add_susfs_in_gki-android14-6.1.patch
 }
+
 update_susfs() {
 	if [ -d "${HOME}/android_kernel/susfs4ksu/.git" ]; then
 		cd ${HOME}/android_kernel/susfs4ksu
@@ -58,6 +66,7 @@ update_susfs() {
 		git clone https://gitlab.com/pershoot/susfs4ksu.git -b gki-android14-6.1-dev --depth=1 ${HOME}/android_kernel/susfs4ksu
 	fi
 }
+
 update_nextsusfs() {
 	if [ -d "${HOME}/android_kernel/ps_susfs4ksu/.git" ]; then
 		cd ${HOME}/android_kernel/ps_susfs4ksu
@@ -69,7 +78,7 @@ update_nextsusfs() {
 	fi
 }
 
-# 固定选择 ReSukiSU + 全部功能
+# 固定选择 BakaSU + 全部功能
 KERNELSU_TAG=4
 SUSFS_STAT=y
 NET_STAT=y
@@ -99,7 +108,7 @@ mkdir -p ${HOME}/android_kernel
 
 # LLVM 工具链（修复：先创建父目录，再移动）
 [ ! -d "${HOME}/android_kernel/build-tools/llvm22" ] && {
-    mkdir -p ${HOME}/android_kernel/build-tools   # 确保父目录存在
+    mkdir -p ${HOME}/android_kernel/build-tools
     wget -P ${HOME}/ https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
     tar -xvf ${HOME}/LLVM-22.1.8-Linux-X64.tar.xz -C ${HOME}
     # 兼容大小写
@@ -115,7 +124,11 @@ mkdir -p ${HOME}/android_kernel
 }
 
 # AnyKernel3
-[ ! -d "${HOME}/android_kernel/AnyKernel3" ] && git clone https://github.com/Kernel-SU/AnyKernel3.git --depth=1 ${HOME}/android_kernel/AnyKernel3
+[ ! -d "${HOME}/android_kernel/AnyKernel3" ] && \
+git clone https://github.com/osm0sis/AnyKernel3.git \
+--depth=1 \
+--branch master \
+${HOME}/android_kernel/AnyKernel3
 
 cd ${KERNEL_DIR}
 git checkout --ours .
@@ -140,7 +153,7 @@ case ${KERNELSU_TAG} in
 		cd ${KERNEL_DIR}
 		[[ "${KERNELSU_TAG}" == "1" ]] && kernelsu_office
 		[[ "${KERNELSU_TAG}" == "3" ]] && sukisu_ultra
-		[[ "${KERNELSU_TAG}" == "4" ]] && resukisu
+		[[ "${KERNELSU_TAG}" == "4" ]] && bakasu
 		;;
 	2)
 		[[ "${SUSFS_STAT}" =~ ^[yY]$ ]] && update_nextsusfs && next_susfs_patch
@@ -185,6 +198,7 @@ CONFIG_KSU_SUSFS_OPEN_REDIRECT=y
 CONFIG_KSU_SUSFS_SUS_MAP=y
 EOF
 		fi
+		;;
 esac
 
 # SSG
