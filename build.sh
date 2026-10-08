@@ -106,12 +106,11 @@ mkdir -p ${HOME}/android_kernel
 # 内核源码
 [ ! -d "${KERNEL_DIR}" ] && git clone https://github.com/xiaoxian8/android_nx721j_kernel.git -b myos14.5 --depth=1 ${KERNEL_DIR}
 
-# LLVM 工具链（修复：先创建父目录，再移动）
+# LLVM 工具链
 [ ! -d "${HOME}/android_kernel/build-tools/llvm22" ] && {
     mkdir -p ${HOME}/android_kernel/build-tools
     wget -P ${HOME}/ https://github.com/llvm/llvm-project/releases/download/llvmorg-22.1.8/LLVM-22.1.8-Linux-X64.tar.xz
     tar -xvf ${HOME}/LLVM-22.1.8-Linux-X64.tar.xz -C ${HOME}
-    # 兼容大小写
     if [ -d "${HOME}/LLVM-22.1.8-Linux-X64" ]; then
         mv ${HOME}/LLVM-22.1.8-Linux-X64 ${HOME}/android_kernel/build-tools/llvm22
     elif [ -d "${HOME}/LLVM-22.1.8-Linux-x64" ]; then
@@ -123,12 +122,25 @@ mkdir -p ${HOME}/android_kernel
     fi
 }
 
-# AnyKernel3
-[ ! -d "${HOME}/android_kernel/AnyKernel3" ] && \
-git clone https://github.com/osm0sis/AnyKernel3.git \
---depth=1 \
---branch master \
-${HOME}/android_kernel/AnyKernel3
+# 使用已经验证过、可以正常工作的 AnyKernel3 模板。
+# 模板文件放在仓库根目录：AnyKernel3-reference-template.zip
+AK3_TEMPLATE="${GITHUB_WORKSPACE}/AnyKernel3-reference-template.zip"
+AK3_DIR="${HOME}/android_kernel/AnyKernel3"
+
+if [ ! -f "${AK3_TEMPLATE}" ]; then
+    echo "❌ 未找到 AnyKernel3-reference-template.zip"
+    echo "请将该文件放在 GitHub 仓库根目录。"
+    exit 1
+fi
+
+rm -rf "${AK3_DIR}"
+mkdir -p "${AK3_DIR}"
+unzip -q "${AK3_TEMPLATE}" -d "${AK3_DIR}"
+
+# Git/ZIP 从仓库恢复时不保证保留可执行权限，运行时统一修复。
+chmod 755 "${AK3_DIR}/anykernel.sh" 2>/dev/null || true
+chmod 755 "${AK3_DIR}/META-INF/com/google/android/update-binary" 2>/dev/null || true
+find "${AK3_DIR}/tools" -type f -exec chmod 755 {} \;
 
 cd ${KERNEL_DIR}
 git checkout --ours .
@@ -337,8 +349,9 @@ if [ ! -f ${OUT_DIR}/arch/arm64/boot/Image ]; then
     exit 1
 fi
 
-cp -v ${OUT_DIR}/arch/arm64/boot/Image ${HOME}/android_kernel/AnyKernel3
-cd ${HOME}/android_kernel/AnyKernel3
+rm -f ${AK3_DIR}/Image
+cp -v ${OUT_DIR}/arch/arm64/boot/Image ${AK3_DIR}/Image
+cd ${AK3_DIR}
 ZIP_NAME="AnyKernel3${KSU_BRANCH}${KSU_VERSION}${SUSFS_V}${BBR_V}${NET_V}${MFY_V}${DDP_V}${SSG_V}${BBG_V}-$(date +%Y-%m-%d).zip"
 zip -r9v ${OUT_DIR}/${ZIP_NAME} *
 
