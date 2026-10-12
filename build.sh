@@ -79,7 +79,7 @@ update_nextsusfs() {
 }
 
 # 固定选择 BakaSU + 全部功能
-KERNELSU_TAG=4
+KERNELSU_TAG=1
 SUSFS_STAT=y
 NET_STAT=y
 BBR_STAT=y
